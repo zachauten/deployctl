@@ -18,6 +18,7 @@ async function main() {
   const projectId = core.getInput("project", { required: true });
   const entrypoint = core.getInput("entrypoint", { required: true });
   const importMap = core.getInput("import-map", {});
+  const access_token = core.getInput("token", {});
   const include = core.getMultilineInput("include", {});
   const exclude = core.getMultilineInput("exclude", {});
   const cwd = resolve(process.cwd(), core.getInput("root", {}));
@@ -40,11 +41,14 @@ async function main() {
 
   const aud = new URL(`/projects/${projectId}`, ORIGIN);
   let token;
-  try {
-    token = await core.getIDToken(aud);
-  } catch {
-    throw "Failed to get the GitHub OIDC token. Make sure that this job has the required permissions for getting GitHub OIDC tokens (see https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings ).";
+  if (!access_token) {
+    try {
+      token = await core.getIDToken(aud);
+    } catch {
+      throw "Failed to get the GitHub OIDC token. Make sure that this job has the required permissions for getting GitHub OIDC tokens (see https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings ).";
+    }
   }
+ 
   core.info(`Project: ${projectId}`);
 
   let url = await parseEntrypoint(entrypoint, cwd);
@@ -86,7 +90,10 @@ async function main() {
   });
   core.debug(`Discovered ${assets.size} assets`);
 
-  const api = new API(`GitHubOIDC ${token}`, ORIGIN, {
+  const api = access_token ? new API(`Bearer ${access_token}`, ORIGIN, {
+    alwaysPrintDenoRay: false,
+    logger: core,
+  }) : new API(`GitHubOIDC ${token}`, ORIGIN, {
     alwaysPrintDenoRay: true,
     logger: core,
   });
